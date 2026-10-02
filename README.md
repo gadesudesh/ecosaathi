@@ -111,8 +111,9 @@ Use these pre-configured accounts for hackathon evaluation:
 | Role | Email | Password | Details |
 | :--- | :--- | :--- | :--- |
 | **Administrator** | `admin@ecoroute.demo` | `admin123` | Full control center, crew management, analytics |
-| **Collection Crew** | `crew@ecoroute.demo` | `crew123` | Crew Alpha lead (assigned active Mumbai pickups) |
-| **Collection Crew** | `crew.bravo@ecoroute.demo` | `crew123` | Crew Bravo lead |
+| **Collection Crew (Alpha)** | `crew@ecoroute.demo` | `crew123` | Crew Alpha lead (`+91 8879752253`) |
+| **Collection Crew (Bravo)** | `crew.bravo@ecoroute.demo` | `crew123` | Crew Bravo lead (`+91 8208039795`) |
+| **Collection Crew (Charlie)** | `crew.charlie@ecoroute.demo` | `crew123` | Crew Charlie lead (`+91 7977598455`) |
 | **Resident** | `rahul@ecoroute.demo` | `resident123` | Rahul Sharma (Andheri West, active pickups) |
 | **Resident** | `priya@ecoroute.demo` | `resident123` | Priya Mehta (Bandra West) |
 

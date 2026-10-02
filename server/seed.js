@@ -67,14 +67,21 @@ const USERS = [
     name: "Crew Alpha Lead",
     email: "crew@ecoroute.demo",
     password: "crew123",
-    phone: "9222000001",
+    phone: "+91 8879752253",
     role: "crew",
   },
   {
     name: "Crew Bravo Lead",
     email: "crew.bravo@ecoroute.demo",
     password: "crew123",
-    phone: "9222000002",
+    phone: "+91 8208039795",
+    role: "crew",
+  },
+  {
+    name: "Crew Charlie Lead",
+    email: "crew.charlie@ecoroute.demo",
+    password: "crew123",
+    phone: "+91 7977598455",
     role: "crew",
   },
 ];
@@ -83,7 +90,7 @@ const USERS = [
 const CREWS = [
   {
     name: "Crew Alpha",
-    phone: "9222000001",
+    phone: "+91 8879752253",
     vehicleNumber: "MH01AB1001",
     status: "AVAILABLE",
     verificationStatus: "APPROVED",
@@ -92,7 +99,7 @@ const CREWS = [
   },
   {
     name: "Crew Bravo",
-    phone: "9222000002",
+    phone: "+91 8208039795",
     vehicleNumber: "MH01AB1002",
     status: "AVAILABLE",
     verificationStatus: "APPROVED",
@@ -101,7 +108,7 @@ const CREWS = [
   },
   {
     name: "Crew Charlie",
-    phone: "9222000003",
+    phone: "+91 7977598455",
     vehicleNumber: "MH01AB1003",
     status: "AVAILABLE",
     verificationStatus: "APPROVED",
@@ -169,12 +176,14 @@ async function seed() {
     const residents = createdUsers.filter((u) => u.role === "resident");
     const crewAlphaUser = createdUsers.find((u) => u.email === "crew@ecoroute.demo");
     const crewBravoUser = createdUsers.find((u) => u.email === "crew.bravo@ecoroute.demo");
+    const crewCharlieUser = createdUsers.find((u) => u.email === "crew.charlie@ecoroute.demo");
 
     // ── Insert crews linked to user accounts ──────────────────────────────
     console.log("\n🚛 Inserting demo collection crews...");
     const crewsToInsert = CREWS.map((c, idx) => {
       if (idx === 0 && crewAlphaUser) return { ...c, user: crewAlphaUser._id };
       if (idx === 1 && crewBravoUser) return { ...c, user: crewBravoUser._id };
+      if (idx === 2 && crewCharlieUser) return { ...c, user: crewCharlieUser._id };
       return c;
     });
     const createdCrews = await CollectionCrew.insertMany(crewsToInsert);
