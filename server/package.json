@@ -1,0 +1,30 @@
+{
+  "name": "ecoroute-server",
+  "version": "1.0.0",
+  "description": "EcoSaathi Smart Waste Collection Optimizer - Backend API",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "seed": "node seed.js"
+  },
+  "keywords": [
+    "waste",
+    "collection",
+    "optimizer",
+    "ecoroute"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^8.4.4"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  }
+}

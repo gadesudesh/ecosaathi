@@ -1,0 +1,5 @@
+# utils/ — Helper functions go here (Phase 02+)
+#
+# Planned files:
+#   priorityEngine.js    ← calculates priorityScore for pickup requests
+#   routeOptimizer.js   ← optimizes crew pickup routes
