@@ -12,6 +12,17 @@ const connectDB = async () => {
   try {
     const conn = await mongoose.connect(process.env.MONGODB_URI);
     console.log(`MongoDB connected successfully: ${conn.connection.host}`);
+
+    // Ensure all existing legacy crew documents have verificationStatus set to APPROVED (Part B3)
+    try {
+      const CollectionCrew = require("../models/CollectionCrew");
+      await CollectionCrew.updateMany(
+        { $or: [{ verificationStatus: { $exists: false } }, { verificationStatus: null }] },
+        { $set: { verificationStatus: "APPROVED", verifiedAt: new Date() } }
+      );
+    } catch (migErr) {
+      // Non-blocking on initial boot
+    }
   } catch (error) {
     console.error(`MongoDB connection failed: ${error.message}`);
     process.exit(1); // Exit process with failure

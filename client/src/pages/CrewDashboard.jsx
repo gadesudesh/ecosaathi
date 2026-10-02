@@ -32,7 +32,7 @@ import { useToast } from '../context/ToastContext';
 
 export default function CrewDashboard() {
   usePageTitle('Crew Dashboard');
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
 
@@ -109,6 +109,118 @@ export default function CrewDashboard() {
   const activeRequests = requests.filter((r) =>
     ['ASSIGNED', 'IN_PROGRESS'].includes(r.status)
   );
+
+  const effectiveVerificationStatus =
+    crew?.verificationStatus || user?.crewProfile?.verificationStatus || 'APPROVED';
+
+  // ── Pending Verification Screen ──
+  if (!loading && effectiveVerificationStatus === 'PENDING_VERIFICATION') {
+    return (
+      <DashboardLayout role="crew" title="Verification Status">
+        <div className="max-w-2xl mx-auto my-8">
+          <div className="card p-8 text-center border border-amber-200 bg-white shadow-sm rounded-2xl">
+            <div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto mb-4 border border-amber-200 shadow-xs">
+              <Clock size={32} />
+            </div>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-100 text-amber-800 mb-3">
+              <span className="w-2 h-2 rounded-full bg-amber-600 animate-pulse"></span>
+              Verification Pending
+            </div>
+            <h2 className="text-2xl font-bold text-slate-900 tracking-tight mb-2">
+              Verification Pending
+            </h2>
+            <p className="text-slate-700 font-medium mb-1">
+              Your EcoSaathi collection crew account is awaiting administrator approval.
+            </p>
+            <p className="text-sm text-slate-500 mb-6">
+              Once verified, you'll be able to receive and manage collection assignments.
+            </p>
+
+            {/* Crew summary details */}
+            <div className="bg-slate-50 rounded-xl p-4 text-left border border-slate-200 text-xs space-y-2 mb-6 max-w-md mx-auto">
+              <div className="flex justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500">Applicant Name:</span>
+                <span className="font-semibold text-slate-800">{user?.name || crew?.name}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500">Email Address:</span>
+                <span className="font-semibold text-slate-800">{user?.email}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500">Phone:</span>
+                <span className="font-semibold text-slate-800">{crew?.phone || user?.phone || '—'}</span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-slate-500">Vehicle Number:</span>
+                <span className="font-mono font-semibold text-slate-800">{crew?.vehicleNumber || user?.crewProfile?.vehicleNumber || '—'}</span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-center gap-3">
+              <button
+                onClick={fetchData}
+                disabled={loading}
+                className="btn-secondary text-xs flex items-center gap-1.5 py-2.5 px-4"
+              >
+                <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+                <span>Check Status</span>
+              </button>
+              <button
+                onClick={() => {
+                  logout();
+                  navigate('/login', { replace: true });
+                }}
+                className="btn-primary text-xs py-2.5 px-5 bg-slate-800 hover:bg-slate-900 text-white font-semibold rounded-lg shadow-sm"
+              >
+                Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // ── Rejected Screen ──
+  if (!loading && effectiveVerificationStatus === 'REJECTED') {
+    return (
+      <DashboardLayout role="crew" title="Verification Status">
+        <div className="max-w-2xl mx-auto my-8">
+          <div className="card p-8 text-center border border-red-200 bg-white shadow-sm rounded-2xl">
+            <div className="w-16 h-16 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center mx-auto mb-4 border border-red-200 shadow-xs">
+              <AlertTriangle size={32} />
+            </div>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-red-100 text-red-800 mb-3">
+              Application Not Approved
+            </div>
+            <h2 className="text-2xl font-bold text-slate-900 tracking-tight mb-2">
+              Application Not Approved
+            </h2>
+            <p className="text-slate-700 font-medium mb-4">
+              Your application to join the EcoSaathi collection fleet could not be approved at this time.
+            </p>
+
+            {(crew?.rejectionReason || user?.crewProfile?.rejectionReason) && (
+              <div className="bg-red-50/50 rounded-xl p-4 text-left border border-red-100 text-xs mb-6 max-w-md mx-auto">
+                <span className="font-bold text-red-800 block mb-1">Reason provided:</span>
+                <p className="text-red-700">{crew?.rejectionReason || user?.crewProfile?.rejectionReason}</p>
+              </div>
+            )}
+
+            <button
+              onClick={() => {
+                logout();
+                navigate('/login', { replace: true });
+              }}
+              className="btn-primary text-xs py-2.5 px-5 bg-slate-800 hover:bg-slate-900 text-white font-semibold rounded-lg shadow-sm"
+            >
+              Sign Out
+            </button>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout role="crew" title="Collection Crew Operations">

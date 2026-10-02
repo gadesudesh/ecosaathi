@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   ClipboardList,
   CheckCircle2,
@@ -27,10 +27,13 @@ import {
   sortCrewPickups,
 } from '../utils/helpers';
 import usePageTitle from '../utils/usePageTitle';
+import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 
 export default function CrewRequestsPage() {
   usePageTitle("Today's Pickups");
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const { addToast } = useToast();
 
   const [crew, setCrew] = useState(null);
@@ -40,6 +43,13 @@ export default function CrewRequestsPage() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
   const [actionLoadingId, setActionLoadingId] = useState(null);
+
+  // Redirect if unapproved crew
+  useEffect(() => {
+    if (user?.role === 'crew' && user?.crewProfile && user.crewProfile.verificationStatus !== 'APPROVED') {
+      navigate('/crew', { replace: true });
+    }
+  }, [user, navigate]);
 
   // Complete confirmation modal state
   const [completingRequest, setCompletingRequest] = useState(null);
@@ -51,6 +61,11 @@ export default function CrewRequestsPage() {
       const res = await getMyCrewRequests();
       const list = res.data?.data || res.data || [];
       const crewInfo = res.data?.crew || null;
+
+      if (crewInfo?.verificationStatus && crewInfo.verificationStatus !== 'APPROVED') {
+        navigate('/crew', { replace: true });
+        return;
+      }
 
       setCrew(crewInfo);
       setRequests(sortCrewPickups(list));

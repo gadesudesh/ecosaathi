@@ -27,6 +27,11 @@ export default function AssignCrewModal({
   const currentCrewId = request.assignedCrew?._id || request.assignedCrew;
   const isReassignment = Boolean(currentCrewId);
 
+  // Only approved collection crews can be assigned pickup requests
+  const approvedCrews = crews.filter(
+    (c) => c.verificationStatus === 'APPROVED' || !c.verificationStatus
+  );
+
   const handleAssign = async () => {
     if (!selectedCrewId) {
       addToast('Please select a collection crew', 'warning');
@@ -99,12 +104,12 @@ export default function AssignCrewModal({
             Available Collection Crews
           </p>
 
-          {crews.length === 0 ? (
+          {approvedCrews.length === 0 ? (
             <div className="p-6 text-center text-xs text-slate-400">
-              No collection crews registered in the system.
+              No approved collection crews are currently available for assignment.
             </div>
           ) : (
-            crews.map((crew) => {
+            approvedCrews.map((crew) => {
               const isSelected = selectedCrewId === crew._id;
               const isCurrent = currentCrewId === crew._id;
               const activeCount = crew.assignedRequests?.length || 0;

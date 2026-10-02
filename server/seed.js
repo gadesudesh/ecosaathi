@@ -86,6 +86,8 @@ const CREWS = [
     phone: "9222000001",
     vehicleNumber: "MH01AB1001",
     status: "AVAILABLE",
+    verificationStatus: "APPROVED",
+    verifiedAt: new Date(),
     currentLocation: { latitude: 19.1136, longitude: 72.8697 }, // Andheri
   },
   {
@@ -93,6 +95,8 @@ const CREWS = [
     phone: "9222000002",
     vehicleNumber: "MH01AB1002",
     status: "AVAILABLE",
+    verificationStatus: "APPROVED",
+    verifiedAt: new Date(),
     currentLocation: { latitude: 19.0544, longitude: 72.8405 }, // Bandra
   },
   {
@@ -100,6 +104,8 @@ const CREWS = [
     phone: "9222000003",
     vehicleNumber: "MH01AB1003",
     status: "AVAILABLE",
+    verificationStatus: "APPROVED",
+    verifiedAt: new Date(),
     currentLocation: { latitude: 19.0176, longitude: 72.8562 }, // Dadar
   },
 ];

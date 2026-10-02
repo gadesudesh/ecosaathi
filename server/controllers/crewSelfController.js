@@ -72,6 +72,25 @@ const getMyCrewRequests = async (req, res) => {
       });
     }
 
+    // Only approved crews can access assigned pickups (Part B8, B10)
+    if (crew.verificationStatus && crew.verificationStatus !== "APPROVED") {
+      return res.status(200).json({
+        success: true,
+        message: "Your crew account is awaiting administrator approval.",
+        count: 0,
+        crew: {
+          _id: crew._id,
+          name: crew.name,
+          phone: crew.phone,
+          vehicleNumber: crew.vehicleNumber,
+          status: crew.status,
+          verificationStatus: crew.verificationStatus,
+          rejectionReason: crew.rejectionReason,
+        },
+        data: [],
+      });
+    }
+
     // Find all requests assigned to this crew (ASSIGNED, IN_PROGRESS, COMPLETED)
     const requests = await PickupRequest.find({ assignedCrew: crew._id })
       .populate("resident", "name email phone address")
@@ -150,6 +169,13 @@ const updateMyCrewStatus = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: "No collection crew profile linked to this account.",
+      });
+    }
+
+    if (crew.verificationStatus && crew.verificationStatus !== "APPROVED") {
+      return res.status(403).json({
+        success: false,
+        message: "Your crew account has not been approved for operations yet.",
       });
     }
 

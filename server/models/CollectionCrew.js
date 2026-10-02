@@ -55,6 +55,30 @@ const collectionCrewSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+
+    // Verification Workflow Fields (Phase 10)
+    verificationStatus: {
+      type: String,
+      enum: ["PENDING_VERIFICATION", "APPROVED", "REJECTED"],
+      default: "PENDING_VERIFICATION",
+    },
+
+    verifiedAt: {
+      type: Date,
+      default: null,
+    },
+
+    verifiedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+
+    rejectionReason: {
+      type: String,
+      default: null,
+      trim: true,
+    },
   },
   {
     timestamps: true, // Adds createdAt and updatedAt automatically

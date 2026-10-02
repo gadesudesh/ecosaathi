@@ -1,20 +1,24 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Leaf, User, Mail, Lock, Phone, UserPlus, AlertCircle, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Leaf, User, Mail, Lock, Phone, Truck, UserPlus, AlertCircle, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 
-export default function RegisterPage() {
+export default function RegisterPage({ defaultRole }) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { register } = useAuth();
   const { addToast } = useToast();
+
+  const initialRole = defaultRole || searchParams.get('role') || 'resident';
 
   const [form, setForm] = useState({
     name: '',
     email: '',
     password: '',
     phone: '',
-    role: 'resident',
+    vehicleNumber: '',
+    role: initialRole === 'crew' ? 'crew' : 'resident',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -34,16 +38,21 @@ export default function RegisterPage() {
       setError('Password must be at least 6 characters long');
       return;
     }
+    if (form.role === 'crew' && !form.vehicleNumber?.trim()) {
+      setError('Vehicle number is required for crew registration');
+      return;
+    }
 
     try {
       setLoading(true);
       setError(null);
       const newUser = await register(form);
-      addToast(`Account created! Welcome, ${newUser.name}.`, 'success');
 
       if (newUser.role === 'crew') {
+        addToast(`Crew application submitted! Awaiting administrator verification.`, 'info');
         navigate('/crew', { replace: true });
       } else {
+        addToast(`Account created! Welcome, ${newUser.name}.`, 'success');
         navigate('/resident', { replace: true });
       }
     } catch (err) {
@@ -199,6 +208,39 @@ export default function RegisterPage() {
                 </button>
               </div>
             </div>
+
+            {/* Crew-specific fields & verification notice */}
+            {form.role === 'crew' && (
+              <div className="space-y-4 pt-1 animate-fadeIn">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Vehicle Number *
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                      <Truck size={16} />
+                    </div>
+                    <input
+                      type="text"
+                      name="vehicleNumber"
+                      required={form.role === 'crew'}
+                      value={form.vehicleNumber}
+                      onChange={handleChange}
+                      placeholder="e.g. MH01AB1234"
+                      className="input pl-9 w-full font-mono uppercase"
+                      disabled={loading}
+                    />
+                  </div>
+                </div>
+
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2.5 text-xs text-amber-900">
+                  <ShieldAlert size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                  <p className="leading-relaxed">
+                    <strong>Admin Verification Required:</strong> New collection crew accounts undergo administrator approval before being assigned collection routes.
+                  </p>
+                </div>
+              </div>
+            )}
 
             <button
               type="submit"

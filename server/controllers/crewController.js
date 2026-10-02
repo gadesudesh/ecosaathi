@@ -1,6 +1,8 @@
 const mongoose = require("mongoose");
+const bcrypt = require("bcryptjs");
 const CollectionCrew = require("../models/CollectionCrew");
 const PickupRequest = require("../models/PickupRequest");
+const User = require("../models/User");
 
 // ── Helper ────────────────────────────────────────────────────────────────────
 function isValidObjectId(id) {
@@ -9,18 +11,46 @@ function isValidObjectId(id) {
 
 // ────────────────────────────────────────────────────────────────────────────
 // GET /api/crews
+// Supports ?verificationStatus=APPROVED | PENDING_VERIFICATION | REJECTED
 // ────────────────────────────────────────────────────────────────────────────
 const getAllCrews = async (req, res) => {
   try {
-    const crews = await CollectionCrew.find()
+    const { verificationStatus } = req.query;
+    const filter = {};
+
+    if (verificationStatus) {
+      if (verificationStatus.toUpperCase() === "APPROVED") {
+        // Backwards compatibility for legacy seeded crews
+        filter.$or = [
+          { verificationStatus: "APPROVED" },
+          { verificationStatus: { $exists: false } },
+          { verificationStatus: null },
+        ];
+      } else {
+        filter.verificationStatus = verificationStatus.toUpperCase();
+      }
+    }
+
+    const crews = await CollectionCrew.find(filter)
       .sort({ createdAt: -1 })
+      .populate("user", "name email phone role")
+      .populate("verifiedBy", "name email")
       .populate("assignedRequests");
+
+    // Ensure verificationStatus is normalized on each record
+    const normalized = crews.map((c) => {
+      const obj = c.toObject ? c.toObject() : c;
+      if (!obj.verificationStatus) {
+        obj.verificationStatus = "APPROVED";
+      }
+      return obj;
+    });
 
     res.status(200).json({
       success: true,
       message: "Crews fetched successfully",
-      count: crews.length,
-      data: crews,
+      count: normalized.length,
+      data: normalized,
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -38,15 +68,24 @@ const getCrewById = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid crew ID format" });
     }
 
-    const crew = await CollectionCrew.findById(id).populate("assignedRequests");
+    const crew = await CollectionCrew.findById(id)
+      .populate("user", "name email phone role")
+      .populate("verifiedBy", "name email")
+      .populate("assignedRequests");
+
     if (!crew) {
       return res.status(404).json({ success: false, message: "Collection crew not found" });
+    }
+
+    const obj = crew.toObject ? crew.toObject() : crew;
+    if (!obj.verificationStatus) {
+      obj.verificationStatus = "APPROVED";
     }
 
     res.status(200).json({
       success: true,
       message: "Crew fetched successfully",
-      data: crew,
+      data: obj,
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -54,13 +93,13 @@ const getCrewById = async (req, res) => {
 };
 
 // ────────────────────────────────────────────────────────────────────────────
-// POST /api/crews
+// POST /api/crews (Admin-created crew: immediately APPROVED)
 // ────────────────────────────────────────────────────────────────────────────
 const createCrew = async (req, res) => {
   try {
-    const { name, phone, vehicleNumber, status, currentLocation } = req.body;
+    const { name, email, password, phone, vehicleNumber, status, currentLocation } = req.body;
 
-    if (!name) {
+    if (!name || !name.trim()) {
       return res.status(400).json({ success: false, message: "Crew name is required" });
     }
 
@@ -84,18 +123,54 @@ const createCrew = async (req, res) => {
       }
     }
 
+    let linkedUser = null;
+    // If email provided, create or link User account
+    if (email && email.trim()) {
+      const cleanEmail = email.toLowerCase().trim();
+      let existingUser = await User.findOne({ email: cleanEmail });
+      if (existingUser) {
+        if (existingUser.role !== "crew") {
+          return res.status(400).json({
+            success: false,
+            message: `User with email ${cleanEmail} exists with role '${existingUser.role}'. Cannot link as crew.`,
+          });
+        }
+        linkedUser = existingUser;
+      } else {
+        const rawPassword = password || "crew123";
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(rawPassword, salt);
+        linkedUser = await User.create({
+          name: name.trim(),
+          email: cleanEmail,
+          password: hashedPassword,
+          phone: phone || "",
+          role: "crew",
+        });
+      }
+    }
+
+    // Admin created crew is APPROVED immediately
     const crew = await CollectionCrew.create({
-      name,
-      phone,
-      vehicleNumber,
+      user: linkedUser ? linkedUser._id : null,
+      name: name.trim(),
+      phone: phone || linkedUser?.phone || "",
+      vehicleNumber: vehicleNumber?.trim() || "MH01-FLEET",
       status: status || "AVAILABLE",
-      currentLocation,
+      verificationStatus: "APPROVED",
+      verifiedAt: new Date(),
+      verifiedBy: req.user ? req.user._id : null,
+      currentLocation: currentLocation || { latitude: 19.076, longitude: 72.8777 },
     });
+
+    const populated = await CollectionCrew.findById(crew._id)
+      .populate("user", "name email phone role")
+      .populate("assignedRequests");
 
     res.status(201).json({
       success: true,
-      message: "Collection crew created successfully",
-      data: crew,
+      message: "Collection crew created and approved successfully",
+      data: populated,
     });
   } catch (error) {
     if (error.name === "ValidationError") {
@@ -211,4 +286,71 @@ const getCrewRequests = async (req, res) => {
   }
 };
 
-module.exports = { getAllCrews, getCrewById, createCrew, updateCrew, getCrewRequests };
+// ────────────────────────────────────────────────────────────────────────────
+// PATCH /api/crews/:id/verify
+// Admin verification endpoint: Approve or Reject a crew application
+// ────────────────────────────────────────────────────────────────────────────
+const verifyCrew = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, rejectionReason } = req.body;
+
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: "Invalid crew ID format" });
+    }
+
+    if (!status || !["APPROVED", "REJECTED"].includes(status.toUpperCase())) {
+      return res.status(400).json({
+        success: false,
+        message: "Status must be either APPROVED or REJECTED",
+      });
+    }
+
+    const nextVerificationStatus = status.toUpperCase();
+
+    const crew = await CollectionCrew.findById(id);
+    if (!crew) {
+      return res.status(404).json({ success: false, message: "Collection crew not found" });
+    }
+
+    crew.verificationStatus = nextVerificationStatus;
+    crew.verifiedAt = new Date();
+    crew.verifiedBy = req.user ? req.user._id : null;
+
+    if (nextVerificationStatus === "APPROVED") {
+      crew.rejectionReason = null;
+      if (crew.status === "OFFLINE" || !crew.status) {
+        crew.status = "AVAILABLE";
+      }
+    } else {
+      crew.rejectionReason = rejectionReason?.trim() || "Application not approved by administrator";
+    }
+
+    await crew.save();
+
+    const updated = await CollectionCrew.findById(id)
+      .populate("user", "name email phone role")
+      .populate("verifiedBy", "name email")
+      .populate("assignedRequests");
+
+    res.status(200).json({
+      success: true,
+      message:
+        nextVerificationStatus === "APPROVED"
+          ? "Crew member approved successfully."
+          : "Crew application rejected.",
+      data: updated,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+module.exports = {
+  getAllCrews,
+  getCrewById,
+  createCrew,
+  updateCrew,
+  getCrewRequests,
+  verifyCrew,
+};

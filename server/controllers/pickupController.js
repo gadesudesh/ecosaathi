@@ -457,6 +457,13 @@ const updateRequestStatus = async (req, res) => {
         });
       }
 
+      if (crew.verificationStatus && crew.verificationStatus !== "APPROVED") {
+        return res.status(403).json({
+          success: false,
+          message: "Your collection crew account has not been approved for operations.",
+        });
+      }
+
       // Check specific workflow state constraints for crew
       if (newStatus === "IN_PROGRESS" && request.status !== "ASSIGNED") {
         return res.status(400).json({
@@ -575,6 +582,14 @@ const assignRequestToCrew = async (req, res) => {
     const crew = await CollectionCrew.findById(crewId);
     if (!crew) {
       return res.status(404).json({ success: false, message: "Collection crew not found" });
+    }
+
+    // Only APPROVED crews can receive assignments (Part D1)
+    if (crew.verificationStatus && crew.verificationStatus !== "APPROVED") {
+      return res.status(400).json({
+        success: false,
+        message: "This collection crew has not been approved for assignments.",
+      });
     }
 
     // If already assigned to this exact crew, return early

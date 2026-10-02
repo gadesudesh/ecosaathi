@@ -176,10 +176,32 @@ export default function AdminDashboard() {
       });
     }
 
+    // 7. Pending crew verification alert (E1)
+    const pendingCrewsCount = crews.filter(
+      (c) => c.verificationStatus === 'PENDING_VERIFICATION'
+    ).length;
+    if (pendingCrewsCount > 0) {
+      alerts.unshift({
+        id: 'crew-pending-verifications',
+        type: 'warning',
+        title: 'Crew Verification Alert',
+        message: `${pendingCrewsCount} collection crew ${
+          pendingCrewsCount === 1 ? 'application is' : 'applications are'
+        } awaiting verification.`,
+        actionLink: '/admin/crews?tab=verification',
+        actionLabel: 'Review Applications →',
+      });
+    }
+
     return alerts;
   }, [requests, crews]);
 
-  const activeCrewsCount = crews.filter((c) => c.status !== 'OFFLINE').length;
+  const pendingCrewsCount = crews.filter(
+    (c) => c.verificationStatus === 'PENDING_VERIFICATION'
+  ).length;
+  const activeCrewsCount = crews.filter(
+    (c) => (c.verificationStatus === 'APPROVED' || !c.verificationStatus) && c.status !== 'OFFLINE'
+  ).length;
   const priorityQueue = requests.slice(0, 7);
 
   const openAssignModal = (req) => {
@@ -277,6 +299,37 @@ export default function AdminDashboard() {
               color="slate"
             />
           </div>
+
+          {/* Pending Crew Verifications Card (Part E) */}
+          {pendingCrewsCount > 0 && (
+            <div className="card p-4 bg-gradient-to-r from-amber-50/80 via-white to-amber-50/40 border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
+                  <Truck size={20} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-slate-900 text-sm">Pending Crew Verifications</h3>
+                    <span className="bg-amber-100 text-amber-800 text-xs font-bold px-2 py-0.5 rounded-full border border-amber-200">
+                      {pendingCrewsCount}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {pendingCrewsCount === 1
+                      ? '1 collection crew application is awaiting administrator verification.'
+                      : `${pendingCrewsCount} collection crew applications are awaiting administrator verification.`}
+                  </p>
+                </div>
+              </div>
+              <Link
+                to="/admin/crews?tab=verification"
+                className="btn-primary text-xs py-2 px-3.5 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg self-start sm:self-auto flex items-center gap-1.5 shadow-xs"
+              >
+                <span>Review Applications</span>
+                <ArrowRight size={13} />
+              </Link>
+            </div>
+          )}
 
           {/* 2. Operations Map & Alerts Main Section */}
           <div className="grid lg:grid-cols-3 gap-6">
@@ -474,6 +527,14 @@ export default function AdminDashboard() {
                               >
                                 Assign Crew Now →
                               </button>
+                            )}
+                            {alert.actionLink && (
+                              <Link
+                                to={alert.actionLink}
+                                className="mt-2 text-[11px] font-bold text-amber-800 hover:text-amber-950 underline flex items-center gap-1"
+                              >
+                                {alert.actionLabel || 'Review →'}
+                              </Link>
                             )}
                           </div>
                         </div>

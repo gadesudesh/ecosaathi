@@ -44,6 +44,7 @@ app.use(express.json());   // Parse incoming JSON request bodies
 // ── Health Check ────────────────────────────────────────
 app.get("/api/health", (req, res) => {
   res.json({
+    status: "OK",
     success: true,
     message: "EcoSaathi API is running",
   });

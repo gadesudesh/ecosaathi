@@ -36,9 +36,14 @@ const ROLE_BADGE_STYLES = {
 
 // ── Sidebar ───────────────────────────────────────────────────────────────────
 function Sidebar({ role, onClose }) {
-  const nav = NAV[role] || NAV.resident;
-  const navigate = useNavigate();
   const { user, logout } = useAuth();
+  let nav = NAV[role] || NAV.resident;
+  if (role === 'crew' && user?.crewProfile && user.crewProfile.verificationStatus !== 'APPROVED') {
+    nav = [
+      { to: '/crew', label: 'Verification Status', icon: Shield },
+    ];
+  }
+  const navigate = useNavigate();
 
   const handleLogout = () => {
     logout();

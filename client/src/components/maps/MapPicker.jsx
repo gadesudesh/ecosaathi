@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
+import React, { useEffect } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -21,7 +21,7 @@ const greenIcon = new L.Icon({
   shadowSize:  [41, 41],
 });
 
-// Mumbai center
+// Mumbai center fallback
 const MUMBAI = { lat: 19.076, lng: 72.8777 };
 
 const GEOAPIFY_KEY = import.meta.env.VITE_GEOAPIFY_API_KEY || '';
@@ -44,6 +44,17 @@ function ClickHandler({ onLocationSelect }) {
   return null;
 }
 
+// ── Dynamic Recenter and Zoom Controller ───────────────────────────────────────
+function MapController({ center, zoom }) {
+  const map = useMap();
+  useEffect(() => {
+    if (center && center[0] != null && center[1] != null) {
+      map.setView(center, zoom || 16, { animate: true });
+    }
+  }, [center, zoom, map]);
+  return null;
+}
+
 /**
  * MapPicker — allows user to click map to select a location.
  *
@@ -52,19 +63,21 @@ function ClickHandler({ onLocationSelect }) {
  *   onChange     (coords) => void
  *   height       CSS height string (default '360px')
  *   readonly     boolean — disable clicking
+ *   zoom         number — map zoom level
  */
-export default function MapPicker({ value, onChange, height = '360px', readonly = false }) {
+export default function MapPicker({ value, onChange, height = '360px', readonly = false, zoom = 13 }) {
   const markerPos = value?.lat && value?.lng ? [value.lat, value.lng] : null;
 
   return (
     <div className="rounded-xl overflow-hidden border border-slate-200" style={{ height }}>
       <MapContainer
         center={markerPos || [MUMBAI.lat, MUMBAI.lng]}
-        zoom={12}
+        zoom={markerPos ? zoom : 12}
         style={{ height: '100%', width: '100%' }}
         scrollWheelZoom={true}
       >
         <TileLayer url={TILE_URL} attribution={ATTRIBUTION} />
+        {markerPos && <MapController center={markerPos} zoom={zoom} />}
         {!readonly && <ClickHandler onLocationSelect={onChange} />}
         {markerPos && (
           <Marker position={markerPos} icon={greenIcon}>

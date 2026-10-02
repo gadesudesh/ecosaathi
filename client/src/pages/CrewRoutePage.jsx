@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Navigation,
   RefreshCw,
@@ -21,6 +21,7 @@ import MapView from '../components/maps/MapView';
 import { LoadingState, ErrorState } from '../components/ui/States';
 import { PriorityBadge, StatusBadge } from '../components/ui/Badges';
 import { getMyRoute, updateRequestStatus } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import {
   wasteTypeLabel,
@@ -30,6 +31,8 @@ import usePageTitle from '../utils/usePageTitle';
 
 export default function CrewRoutePage() {
   usePageTitle("Today's Smart Route");
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const { addToast } = useToast();
 
   const [routeData, setRouteData] = useState(null);
@@ -40,6 +43,13 @@ export default function CrewRoutePage() {
   const [focusedPosition, setFocusedPosition] = useState(null);
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const [showExplainer, setShowExplainer] = useState(false);
+
+  // Redirect if unapproved crew
+  useEffect(() => {
+    if (user?.role === 'crew' && user?.crewProfile && user.crewProfile.verificationStatus !== 'APPROVED') {
+      navigate('/crew', { replace: true });
+    }
+  }, [user, navigate]);
 
   const fetchRoute = async (isManualRefresh = false) => {
     try {

@@ -89,8 +89,8 @@ export const getRequestStats = () =>
 // ════════════════════════════════════════════════════════════════════════════
 // COLLECTION CREWS
 // ════════════════════════════════════════════════════════════════════════════
-export const getCrews = () =>
-  API.get('/api/crews');
+export const getCrews = (params = {}) =>
+  API.get('/api/crews', { params });
 
 export const getCrew = (id) =>
   API.get(`/api/crews/${id}`);
@@ -100,6 +100,9 @@ export const createCrew = (data) =>
 
 export const updateCrew = (id, data) =>
   API.patch(`/api/crews/${id}`, data);
+
+export const verifyCrew = (id, data) =>
+  API.patch(`/api/crews/${id}/verify`, data);
 
 export const getCrewRequests = (id) =>
   API.get(`/api/crews/${id}/requests`);

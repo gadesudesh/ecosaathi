@@ -37,6 +37,7 @@ export default function App() {
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/crew/register" element={<RegisterPage defaultRole="crew" />} />
 
             {/* Resident Routes (Resident + Admin can access) */}
             <Route

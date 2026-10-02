@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   MapPin, Send, AlertCircle, CheckCircle2, ArrowRight,
-  Sparkles, ShieldAlert, ArrowLeft, Loader2, Info
+  Sparkles, ShieldAlert, ArrowLeft, Loader2, Info, LocateFixed
 } from 'lucide-react';
 import DashboardLayout from '../components/layout/DashboardLayout';
 import MapPicker from '../components/maps/MapPicker';
@@ -55,8 +55,80 @@ export default function RequestPickupPage() {
   const [errors, setErrors] = useState({});
   const [createdRequest, setCreatedRequest] = useState(null);
   const [geocoding, setGeocoding] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [locationAccuracy, setLocationAccuracy] = useState(null);
+  const [mapZoom, setMapZoom] = useState(13);
 
-  // Map click handler with non-blocking reverse geocoding
+  // ── Reverse Geocoding with Geoapify (Part A5) ──────────────────────────────
+  const reverseGeocode = useCallback(async (lat, lng) => {
+    setGeocoding(true);
+    const geoapifyKey = import.meta.env.VITE_GEOAPIFY_API_KEY || '';
+
+    try {
+      if (geoapifyKey) {
+        const res = await fetch(
+          `https://api.geoapify.com/v1/geocode/reverse?lat=${lat}&lon=${lng}&apiKey=${geoapifyKey}`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          const bestAddress = data?.features?.[0]?.properties?.formatted;
+          if (bestAddress) {
+            setForm((prev) => ({
+              ...prev,
+              location: {
+                ...prev.location,
+                address: bestAddress,
+              },
+            }));
+            return;
+          }
+        }
+      }
+
+      // Lightweight fallback to OpenStreetMap Nominatim if Geoapify key is absent or fails
+      const osmRes = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=16&addressdetails=1`,
+        { headers: { 'Accept-Language': 'en' } }
+      );
+      if (osmRes.ok) {
+        const osmData = await osmRes.json();
+        if (osmData?.display_name) {
+          const parts = osmData.display_name.split(', ');
+          const shortAddress = parts.slice(0, 3).join(', ');
+          setForm((prev) => ({
+            ...prev,
+            location: {
+              ...prev.location,
+              address: shortAddress || osmData.display_name,
+            },
+          }));
+          return;
+        }
+      }
+
+      // If geocoding fails completely, keep coordinates and set fallback message
+      setForm((prev) => ({
+        ...prev,
+        location: {
+          ...prev.location,
+          address: 'Address could not be determined automatically.',
+        },
+      }));
+    } catch {
+      // Non-blocking fallback
+      setForm((prev) => ({
+        ...prev,
+        location: {
+          ...prev.location,
+          address: 'Address could not be determined automatically.',
+        },
+      }));
+    } finally {
+      setGeocoding(false);
+    }
+  }, []);
+
+  // ── Manual Map Click Handler (Part A6) ─────────────────────────────────────
   const handleMapClick = useCallback((coords) => {
     const lat = parseFloat(coords.lat.toFixed(6));
     const lng = parseFloat(coords.lng.toFixed(6));
@@ -67,37 +139,87 @@ export default function RequestPickupPage() {
         ...prev.location,
         latitude: lat,
         longitude: lng,
-        address: prev.location.address || `Location at ${lat.toFixed(4)}, ${lng.toFixed(4)}`,
+        address: prev.location.address || '',
       },
     }));
     setErrors((prev) => ({ ...prev, location: undefined }));
+    setLocationAccuracy(null);
 
-    // Attempt lightweight reverse geocode from OpenStreetMap Nominatim
-    setGeocoding(true);
-    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=16&addressdetails=1`, {
-      headers: { 'Accept-Language': 'en' },
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data && data.display_name) {
-          const parts = data.display_name.split(', ');
-          const shortAddress = parts.slice(0, 3).join(', ');
-          setForm((prev) => ({
-            ...prev,
-            location: {
-              ...prev.location,
-              address: shortAddress || data.display_name,
-            },
-          }));
+    reverseGeocode(lat, lng);
+  }, [reverseGeocode]);
+
+  // ── Geolocation API Handler (Part A1, A2, A3, A4, A8) ──────────────────────
+  const handleUseCurrentLocation = useCallback(() => {
+    if (locating) return;
+
+    if (!navigator.geolocation) {
+      addToast(
+        'Geolocation is not supported by your browser. Please select your pickup location manually on the map.',
+        'warning'
+      );
+      return;
+    }
+
+    setLocating(true);
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = parseFloat(position.coords.latitude.toFixed(6));
+        const lng = parseFloat(position.coords.longitude.toFixed(6));
+        const accuracy = position.coords.accuracy ? Math.round(position.coords.accuracy) : null;
+
+        setLocationAccuracy(accuracy);
+        setMapZoom(17); // Zoom Leaflet map into high precision (16-18)
+
+        setForm((prev) => ({
+          ...prev,
+          location: {
+            latitude: lat,
+            longitude: lng,
+            address: prev.location.address || '',
+          },
+        }));
+        setErrors((prev) => ({ ...prev, location: undefined }));
+
+        reverseGeocode(lat, lng);
+        addToast('Retrieved your current GPS location! 📍', 'success');
+        setLocating(false);
+      },
+      (geoError) => {
+        setLocating(false);
+        switch (geoError.code) {
+          case geoError.PERMISSION_DENIED:
+            addToast(
+              'Location permission was denied. You can still select your pickup location manually on the map.',
+              'warning'
+            );
+            break;
+          case geoError.POSITION_UNAVAILABLE:
+            addToast(
+              "We couldn't determine your current location. Please select it manually on the map.",
+              'warning'
+            );
+            break;
+          case geoError.TIMEOUT:
+            addToast(
+              'Getting your location took too long. Please try again or select it manually.',
+              'warning'
+            );
+            break;
+          default:
+            addToast(
+              'Unable to retrieve current location. Please tap the map to choose manually.',
+              'warning'
+            );
         }
-      })
-      .catch(() => {
-        // Fallback gracefully without blocking
-      })
-      .finally(() => {
-        setGeocoding(false);
-      });
-  }, []);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000,
+      }
+    );
+  }, [locating, addToast, reverseGeocode]);
 
   const validate = () => {
     const errs = {};
@@ -465,7 +587,7 @@ export default function RequestPickupPage() {
                 <div>
                   <h3 className="section-title">5. Pickup Location *</h3>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Tap the map to select where the waste should be collected.
+                    Select where our collection vehicle should pick up your waste.
                   </p>
                 </div>
                 {errors.location && (
@@ -474,6 +596,47 @@ export default function RequestPickupPage() {
                     {errors.location}
                   </span>
                 )}
+              </div>
+
+              {/* Option 1: Use Your Current Location (Part A, Part Q) */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 bg-green-50/50 p-3.5 rounded-xl border border-green-200">
+                <button
+                  type="button"
+                  onClick={handleUseCurrentLocation}
+                  disabled={locating || loading}
+                  className="inline-flex items-center justify-center gap-2 py-2 px-4 rounded-xl border border-green-600 bg-white hover:bg-green-600 hover:text-white text-green-700 font-semibold text-xs shadow-xs transition-all disabled:opacity-60"
+                >
+                  {locating ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin text-green-600" />
+                      <span>Getting your location...</span>
+                    </>
+                  ) : (
+                    <>
+                      <LocateFixed size={16} className="text-green-600 group-hover:text-white" />
+                      <span>Use Your Current Location</span>
+                    </>
+                  )}
+                </button>
+
+                {locationAccuracy ? (
+                  <span className="text-[11px] text-slate-500 font-medium">
+                    Location accuracy: approximately {locationAccuracy} m
+                  </span>
+                ) : (
+                  <span className="text-[11px] text-slate-400">
+                    Uses device browser GPS with high accuracy
+                  </span>
+                )}
+              </div>
+
+              {/* Visual Divider (Part Q) */}
+              <div className="relative flex py-1 items-center">
+                <div className="flex-grow border-t border-slate-200"></div>
+                <span className="flex-shrink mx-3 text-slate-400 text-[11px] font-semibold uppercase tracking-wider">
+                  or choose manually on the map
+                </span>
+                <div className="flex-grow border-t border-slate-200"></div>
               </div>
 
               {/* Leaflet interactive Map */}
@@ -485,6 +648,7 @@ export default function RequestPickupPage() {
                       : null
                   }
                   onChange={handleMapClick}
+                  zoom={mapZoom}
                   height="340px"
                 />
               </div>

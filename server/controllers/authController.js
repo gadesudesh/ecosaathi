@@ -69,19 +69,49 @@ const register = async (req, res) => {
       role:     resolvedRole,
     });
 
+    let crewProfile = null;
+    if (resolvedRole === "crew") {
+      try {
+        const crewDoc = await CollectionCrew.create({
+          user: user._id,
+          name: user.name,
+          phone: user.phone || "",
+          vehicleNumber: req.body.vehicleNumber?.trim() || "MH01-PENDING",
+          verificationStatus: "PENDING_VERIFICATION", // Always pending on self-registration
+          status: "AVAILABLE",
+          currentLocation: { latitude: 19.076, longitude: 72.8777 },
+        });
+        crewProfile = {
+          _id: crewDoc._id,
+          id: crewDoc._id,
+          name: crewDoc.name,
+          status: crewDoc.status,
+          vehicleNumber: crewDoc.vehicleNumber,
+          verificationStatus: crewDoc.verificationStatus,
+        };
+      } catch (crewErr) {
+        // Rollback user creation to maintain consistency
+        await User.findByIdAndDelete(user._id);
+        throw new Error(`Failed to initialize crew profile: ${crewErr.message}`);
+      }
+    }
+
     const token = generateToken(user);
 
     res.status(201).json({
       success: true,
-      message: "Account created successfully",
+      message: resolvedRole === "crew" 
+        ? "Crew account created and submitted for verification" 
+        : "Account created successfully",
       data: {
         token,
         user: {
-          id:    user._id,
-          name:  user.name,
-          email: user.email,
-          role:  user.role,
-          phone: user.phone,
+          id:          user._id,
+          name:        user.name,
+          email:       user.email,
+          role:        user.role,
+          phone:       user.phone,
+          crewProfile: crewProfile || undefined,
         },
       },
     });
@@ -126,10 +156,16 @@ const login = async (req, res) => {
       });
     }
 
-    // For crew users, fetch their linked crew profile
+    // For crew users, fetch their linked crew profile including verificationStatus
     let crewProfile = null;
     if (user.role === "crew") {
-      crewProfile = await CollectionCrew.findOne({ user: user._id }).select("_id name status");
+      crewProfile = await CollectionCrew.findOne({ user: user._id }).select(
+        "_id name status vehicleNumber verificationStatus verifiedAt rejectionReason"
+      );
+      // Fallback: If legacy crew had no verificationStatus, treat as APPROVED
+      if (crewProfile && !crewProfile.verificationStatus) {
+        crewProfile.verificationStatus = "APPROVED";
+      }
     }
 
     const token = generateToken(user);
@@ -161,12 +197,15 @@ const getMe = async (req, res) => {
   try {
     const user = req.user; // already attached by protect middleware
 
-    // For crew users, also return their crew profile
+    // For crew users, also return their crew profile with verification fields
     let crewProfile = null;
     if (user.role === "crew") {
       crewProfile = await CollectionCrew.findOne({ user: user._id }).select(
-        "_id name status vehicleNumber assignedRequests completedRequests"
+        "_id name status vehicleNumber verificationStatus verifiedAt rejectionReason assignedRequests completedRequests"
       );
+      if (crewProfile && !crewProfile.verificationStatus) {
+        crewProfile.verificationStatus = "APPROVED";
+      }
     }
 
     res.status(200).json({

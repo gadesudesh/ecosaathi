@@ -6,6 +6,7 @@ const {
   createCrew,
   updateCrew,
   getCrewRequests,
+  verifyCrew,
 } = require("../controllers/crewController");
 const { protect, authorize } = require("../middleware/authMiddleware");
 
@@ -22,6 +23,9 @@ router.get("/:id", protect, authorize("admin", "crew"), getCrewById);
 
 // POST /api/crews           — create crew (admin only)
 router.post("/", protect, authorize("admin"), createCrew);
+
+// PATCH /api/crews/:id/verify — approve or reject crew application (admin only)
+router.patch("/:id/verify", protect, authorize("admin"), verifyCrew);
 
 // PATCH /api/crews/:id      — update crew (admin only)
 router.patch("/:id", protect, authorize("admin"), updateCrew);

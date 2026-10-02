@@ -19,18 +19,25 @@ async function resolveCrewForUser(user) {
 
   // 2. Attached crewProfile on User
   if (user.crewProfile) {
-    crew = await CollectionCrew.findById(user.crewProfile);
-    if (crew) return crew;
+    const profileId = typeof user.crewProfile === 'object' ? user.crewProfile._id || user.crewProfile.id : user.crewProfile;
+    if (profileId) {
+      crew = await CollectionCrew.findById(profileId);
+      if (crew) return crew;
+    }
   }
 
-  // 3. Fallback matching by phone or name
+  // 3. Fallback matching by phone
   if (user.phone) {
     crew = await CollectionCrew.findOne({ phone: user.phone });
     if (crew) return crew;
   }
 
-  // 4. Default to first crew if running in demo environment
-  return await CollectionCrew.findOne();
+  // 4. Admin preview fallback only
+  if (user.role === 'admin') {
+    return await CollectionCrew.findOne();
+  }
+
+  return null;
 }
 
 /**
@@ -45,6 +52,14 @@ async function getMyCrewRoute(req, res, next) {
       return res.status(404).json({
         success: false,
         message: 'No collection crew profile linked to this account.',
+      });
+    }
+
+    // Must be approved to view operational route (Part B10, Part I)
+    if (crew.verificationStatus && crew.verificationStatus !== 'APPROVED') {
+      return res.status(403).json({
+        success: false,
+        message: 'This collection crew account has not been approved for route operations.',
       });
     }
 
